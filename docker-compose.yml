@@ -67,6 +67,24 @@ services:
     networks:
       - mynetwork  # Connects Celery to the custom network.
 
+  # Vite + React.js Frontend Service - Serves the frontend application.
+  frontend:
+    build:
+      context: ./frontend  # Points to the frontend directory containing Vite + React.js project.
+    container_name: vite_react_app  # Assigns a custom name to the frontend container.
+    ports:
+      - "5173:5173"  # Maps the Vite development server port 5173 from the container to the host.
+    volumes:
+      - ./frontend:/app  # Mounts the frontend directory for live updates during development.
+      - /app/node_modules  # Prevents overwriting node_modules inside the container.
+    depends_on:
+      - web  # Ensures the Django backend starts before the frontend.
+    environment:
+      - VITE_API_URL=http://web:8000  # Configures API base URL for the frontend.
+    command: ["npm", "run", "dev"]  # Runs the Vite development server.
+    networks:
+      - mynetwork  # Connects the frontend to the custom network.
+
 # Define Named Volumes - Stores persistent data for services.
 volumes:
   dbdata:  # Volume for PostgreSQL database data.
