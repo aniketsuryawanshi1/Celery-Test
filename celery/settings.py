@@ -25,7 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'app',
-    'celery',  # Ensure Celery app is included
+    'channels',  # Add Django Channels
 ]
 
 MIDDLEWARE = [
@@ -56,7 +56,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'celery.wsgi.application'
+# Use ASGI for WebSockets support
+ASGI_APPLICATION = 'celery.asgi.application'
 
 # Database Configuration (Use PostgreSQL)
 DATABASES = {
@@ -89,6 +90,16 @@ AUTH_PASSWORD_VALIDATORS = [
 # Celery Configuration (Fix Redis URLs)
 CELERY_BROKER_URL = 'redis://redis:6379/0'  # Use 'redis' instead of 'localhost'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+
+# WebSockets & Channels Configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],  # Use the Redis service from Docker
+        },
+    },
+}
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'

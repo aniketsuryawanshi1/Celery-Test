@@ -1,97 +1,113 @@
-version: '3.8'  # Specifies the Docker Compose version being used.
+version: "3.8" # Specifies the Docker Compose version being used.
 
 # Define Services
 services:
-
-  # Redis Service - Used as a message broker for Celery.
+  # Redis Service - Used as a message broker for Celery and WebSockets.
   redis:
-    image: redis:alpine  # Uses the Redis image with the Alpine Linux distribution (lightweight).
-    container_name: redis  # Assigns a custom name to the container.
+    image: redis:alpine # Uses the Redis image with the Alpine Linux distribution (lightweight).
+    container_name: redis # Assigns a custom name to the container.
     ports:
-      - "6379:6379"  # Maps the Redis port 6379 from the container to the host.
+      - "6379:6379" # Maps the Redis port 6379 from the container to the host.
     networks:
-      - mynetwork  # Connects Redis to a custom network for inter-service communication.
+      - mynetwork # Connects Redis to a custom network for inter-service communication.
 
   # PostgreSQL Database Service - Stores application data.
   db:
-    image: testimage  # Uses a PostgreSQL database image (customized as "testimage").
-    restart: always  # Ensures the database container restarts automatically if it crashes.
+    image: testimage # Uses a PostgreSQL database image (customized as "testimage").
+    restart: always # Ensures the database container restarts automatically if it crashes.
     volumes:
-      - dbdata:/var/lib/postgresql/data  # Creates a persistent volume for PostgreSQL data.
-    environment:  # Environment variables to configure PostgreSQL.
-      - POSTGRES_DB=${POSTGRES_DB}  # Database name fetched from the .env file.
-      - POSTGRES_USER=${POSTGRES_USER}  # Database user fetched from the .env file.
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}  # Database password fetched from the .env file.
-    container_name: testDbName  # Assigns a custom name to the PostgreSQL container.
+      - dbdata:/var/lib/postgresql/data # Creates a persistent volume for PostgreSQL data.
+    environment: # Environment variables to configure PostgreSQL.
+      - POSTGRES_DB=${POSTGRES_DB} # Database name fetched from the .env file.
+      - POSTGRES_USER=${POSTGRES_USER} # Database user fetched from the .env file.
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # Database password fetched from the .env file.
+    container_name: testDbName # Assigns a custom name to the PostgreSQL container.
     networks:
-      - mynetwork  # Connects the database to the same custom network.
+      - mynetwork # Connects the database to the same custom network.
 
   # Django Web Application Service - Runs the main application.
   web:
     build:
-      context: .  # Builds the Docker image from the current directory (where Dockerfile is located).
+      context: . # Builds the Docker image from the current directory (where Dockerfile is located).
     volumes:
-      - .:/django  # Mounts the local project directory to the container for live code updates.
-      - static_volume:/app/staticfiles  # Stores static files persistently.
-      - media_volume:/app/media  # Stores uploaded media files persistently.
+      - .:/django # Mounts the local project directory to the container for live code updates.
+      - static_volume:/app/staticfiles # Stores static files persistently.
+      - media_volume:/app/media # Stores uploaded media files persistently.
     depends_on:
-      - db  # Ensures the database starts before the Django application.
-      - redis  # Ensures Redis starts before Django (for Celery message queuing).
+      - db # Ensures the database starts before the Django application.
+      - redis # Ensures Redis starts before Django (for Celery and WebSockets).
     env_file:
-      - .env  # Loads environment variables from the .env file.
+      - .env # Loads environment variables from the .env file.
     ports:
-      - "8000:8000"  # Maps port 8000 from the container to the host (for web access).
-    image: app:django  # Assigns a custom image name for the Django app.
-    container_name: django_test_app  # Assigns a custom name to the Django container.
-    command: 
-      ["gunicorn", "--bind", "0.0.0.0:8000", "django_test_app.wsgi:application"]  
-      # Runs the Django application using Gunicorn as the production server.
+      - "8000:8000" # Maps port 8000 from the container to the host (for web access).
+    image: app:django # Assigns a custom image name for the Django app.
+    container_name: django_test_app # Assigns a custom name to the Django container.
+    command:
+      [
+        "daphne",
+        "-b",
+        "0.0.0.0",
+        "-p",
+        "8000",
+        "django_test_app.asgi:application",
+      ]
+      # Runs the Django application using Daphne for WebSockets support.
     networks:
-      - mynetwork  # Connects Django to the custom network.
+      - mynetwork # Connects Django to the custom network.
 
   # Celery Worker Service - Handles background tasks asynchronously.
   celery:
-    restart: always  # Ensures Celery restarts automatically if it crashes.
+    restart: always # Ensures Celery restarts automatically if it crashes.
     build:
-      context: .  # Uses the same build context as Django (reuses the same Dockerfile).
-    command: celery -A django_test_app worker -l info  # Runs the Celery worker process.
+      context: . # Uses the same build context as Django (reuses the same Dockerfile).
+    command: celery -A django_test_app worker -l info # Runs the Celery worker process.
     volumes:
-      - .:/django  # Mounts the project directory for access to code.
-    container_name: celery  # Assigns a custom name to the Celery worker container.
+      - .:/django # Mounts the project directory for access to code.
+    container_name: celery # Assigns a custom name to the Celery worker container.
     depends_on:
-      - db  # Ensures Celery starts after the database.
-      - redis  # Ensures Celery starts after Redis.
-      - web  # Ensures Celery starts after the Django application.
+      - db # Ensures Celery starts after the database.
+      - redis # Ensures Celery starts after Redis.
+      - web # Ensures Celery starts after the Django application.
     env_file:
-      - .env  # Loads environment variables for Celery from the .env file.
+      - .env # Loads environment variables for Celery from the .env file.
     networks:
-      - mynetwork  # Connects Celery to the custom network.
+      - mynetwork # Connects Celery to the custom network.
+
+  # WebSocket Message Broker (Channels Redis)
+  channels-redis:
+    image: redis:alpine
+    container_name: channels_redis
+    restart: always
+    ports:
+      - "6380:6379"
+    networks:
+      - mynetwork
 
   # Vite + React.js Frontend Service - Serves the frontend application.
   frontend:
     build:
-      context: ./frontend  # Points to the frontend directory containing Vite + React.js project.
-    container_name: vite_react_app  # Assigns a custom name to the frontend container.
+      context: ./frontend # Points to the frontend directory containing Vite + React.js project.
+    container_name: vite_react_app # Assigns a custom name to the frontend container.
     ports:
-      - "5173:5173"  # Maps the Vite development server port 5173 from the container to the host.
+      - "5173:5173" # Maps the Vite development server port 5173 from the container to the host.
     volumes:
-      - ./frontend:/app  # Mounts the frontend directory for live updates during development.
-      - /app/node_modules  # Prevents overwriting node_modules inside the container.
+      - ./frontend:/app # Mounts the frontend directory for live updates during development.
+      - /app/node_modules # Prevents overwriting node_modules inside the container.
     depends_on:
-      - web  # Ensures the Django backend starts before the frontend.
+      - web # Ensures the Django backend starts before the frontend.
     environment:
-      - VITE_API_URL=http://web:8000  # Configures API base URL for the frontend.
-    command: ["npm", "run", "dev"]  # Runs the Vite development server.
+      - VITE_API_URL=http://web:8000 # Configures API base URL for the frontend.
+    command: ["npm", "run", "dev"] # Runs the Vite development server.
     networks:
-      - mynetwork  # Connects the frontend to the custom network.
+      - mynetwork # Connects the frontend to the custom network.
 
 # Define Named Volumes - Stores persistent data for services.
 volumes:
-  dbdata:  # Volume for PostgreSQL database data.
-  static_volume:  # Volume for Django static files.
-  media_volume:  # Volume for uploaded media files.
+  dbdata: # Volume for PostgreSQL database data.
+  static_volume: # Volume for Django static files.
+  media_volume: # Volume for uploaded media files.
 
 # Define Networks - Allows services to communicate internally.
 networks:
   mynetwork:
-    driver: bridge  # Uses a bridge network to enable inter-container communication.
+    driver: bridge # Uses a bridge network to enable inter-container communication.

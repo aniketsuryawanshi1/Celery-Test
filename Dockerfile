@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies required for PostgreSQL
+# Install system dependencies required for PostgreSQL and WebSockets
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
@@ -30,5 +30,5 @@ RUN chmod +x manage.py
 # Expose port 8000 for Django application
 EXPOSE 8000
 
-# Default command to run Gunicorn as the production server
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "django_test_app.wsgi:application"]
+# Default command to run the application with WebSockets support
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "django_test_app.asgi:application"]
