@@ -117,10 +117,11 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("redis", 6379)],  # Use the Redis service from Docker
+            "hosts": [("127.0.0.1", 6379)],  # Change from 'redis' to '127.0.0.1'
         },
     },
 }
+
 
 
 
