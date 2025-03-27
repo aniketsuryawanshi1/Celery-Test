@@ -26,6 +26,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'app',
     'channels',  # Add Django Channels
+     'django_celery_beat',
+     
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
@@ -38,7 +41,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'celery.urls'
+ROOT_URLCONF = 'celery_project.urls'
 
 TEMPLATES = [
     {
@@ -58,6 +61,7 @@ TEMPLATES = [
 
 # Use ASGI for WebSockets support
 ASGI_APPLICATION = 'celery.asgi.application'
+
 
 # Database Configuration (Use PostgreSQL)
 DATABASES = {
@@ -88,8 +92,17 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Celery Configuration (Fix Redis URLs)
-CELERY_BROKER_URL = 'redis://redis:6379/0'  # Use 'redis' instead of 'localhost'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+
+CELERY_BROKER_URL = "redis://redis:6379/0"
+CELERY_RESULT_BACKEND = "redis://redis:6379/0"
+CELERY_BEAT_SCHEDULE = {
+    "delete-student-objects-every-10-seconds": {
+        "task": "core.tasks.delete_student_objects",
+        "schedule": 10.0,  # Every 10 seconds
+    },
+}
+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # WebSockets & Channels Configuration
 CHANNEL_LAYERS = {
@@ -100,6 +113,9 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+
+
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'

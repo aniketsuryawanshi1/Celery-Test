@@ -14,6 +14,12 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*  # Clean up to reduce image size
 
+
+
+# Install psycopg2-binary separately
+RUN pip install --no-cache-dir psycopg2-binary
+
+
 # Copy dependency file and install dependencies
 COPY requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
@@ -31,4 +37,4 @@ RUN chmod +x manage.py
 EXPOSE 8000
 
 # Default command to run the application with WebSockets support
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "django_test_app.asgi:application"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "celery_project.asgi:application"]

@@ -13,11 +13,14 @@ services:
 
   # PostgreSQL Database Service - Stores application data.
   db:
-    image: testimage # Uses a PostgreSQL database image (customized as "testimage").
+
+    image: postgres:15
+    # Uses a PostgreSQL database image (customized as "testimage").
     restart: always # Ensures the database container restarts automatically if it crashes.
     volumes:
       - dbdata:/var/lib/postgresql/data # Creates a persistent volume for PostgreSQL data.
-    environment: # Environment variables to configure PostgreSQL.
+    environment:
+      # Environment variables to configure PostgreSQL.
       - POSTGRES_DB=${POSTGRES_DB} # Database name fetched from the .env file.
       - POSTGRES_USER=${POSTGRES_USER} # Database user fetched from the .env file.
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # Database password fetched from the .env file.
@@ -42,16 +45,7 @@ services:
       - "8000:8000" # Maps port 8000 from the container to the host (for web access).
     image: app:django # Assigns a custom image name for the Django app.
     container_name: django_test_app # Assigns a custom name to the Django container.
-    command:
-      [
-        "daphne",
-        "-b",
-        "0.0.0.0",
-        "-p",
-        "8000",
-        "django_test_app.asgi:application",
-      ]
-      # Runs the Django application using Daphne for WebSockets support.
+    command: [ "daphne", "-b", "0.0.0.0", "-p", "8000", "celery_project.asgi:application" ] # Runs the Django application using Daphne for WebSockets support.
     networks:
       - mynetwork # Connects Django to the custom network.
 
@@ -60,7 +54,7 @@ services:
     restart: always # Ensures Celery restarts automatically if it crashes.
     build:
       context: . # Uses the same build context as Django (reuses the same Dockerfile).
-    command: celery -A django_test_app worker -l info # Runs the Celery worker process.
+    command: celery -A celery_project worker -l info # Runs the Celery worker process.
     volumes:
       - .:/django # Mounts the project directory for access to code.
     container_name: celery # Assigns a custom name to the Celery worker container.
@@ -73,6 +67,24 @@ services:
     networks:
       - mynetwork # Connects Celery to the custom network.
 
+  celery_beat:
+    restart: always
+    build:
+      context: . # Uses the same build context as Django (reuses the same Dockerfile)
+    command: celery -A celery_project beat -l info # Runs Celery Beat process
+    volumes:
+      - .:/django # Mounts the project directory
+    container_name: celery_beat # Assigns a custom name
+    depends_on:
+      - db
+      - redis
+      - web
+      - celery
+    env_file:
+      - .env # Loads environment variables for Celery Beat
+    networks:
+      - mynetwork
+
   # WebSocket Message Broker (Channels Redis)
   channels-redis:
     image: redis:alpine
@@ -83,31 +95,14 @@ services:
     networks:
       - mynetwork
 
-  # Vite + React.js Frontend Service - Serves the frontend application.
-  frontend:
-    build:
-      context: ./frontend # Points to the frontend directory containing Vite + React.js project.
-    container_name: vite_react_app # Assigns a custom name to the frontend container.
-    ports:
-      - "5173:5173" # Maps the Vite development server port 5173 from the container to the host.
-    volumes:
-      - ./frontend:/app # Mounts the frontend directory for live updates during development.
-      - /app/node_modules # Prevents overwriting node_modules inside the container.
-    depends_on:
-      - web # Ensures the Django backend starts before the frontend.
-    environment:
-      - VITE_API_URL=http://web:8000 # Configures API base URL for the frontend.
-    command: ["npm", "run", "dev"] # Runs the Vite development server.
-    networks:
-      - mynetwork # Connects the frontend to the custom network.
-
 # Define Named Volumes - Stores persistent data for services.
 volumes:
   dbdata: # Volume for PostgreSQL database data.
   static_volume: # Volume for Django static files.
-  media_volume: # Volume for uploaded media files.
+  media_volume:
+    # Volume for uploaded media files.
 
-# Define Networks - Allows services to communicate internally.
+    # Define Networks - Allows services to communicate internally.
 networks:
   mynetwork:
     driver: bridge # Uses a bridge network to enable inter-container communication.
